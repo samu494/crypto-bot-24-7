@@ -862,102 +862,111 @@ async def verify_news(title, body="", source=""):
 
 
 async def fetch_new_coins(limit=10):
-    async with aiohttp.ClientSession() as session:
-        url = f"{COINGECKO_BASE}/coins/list"
-        async with session.get(url) as resp:
-            if resp.status != 200:
-                return []
-            all_coins = await resp.json()
-        url2 = f"{COINGECKO_BASE}/coins/markets"
-        params = {
-            "vs_currency": "usd",
-            "order": "market_cap_desc",
-            "per_page": 250,
-            "page": 1,
-            "sparkline": "false",
-        }
-        async with session.get(url2, params=params) as resp:
-            if resp.status != 200:
-                return []
-            market_coins = await resp.json()
-        market_ids = {c["id"] for c in market_coins}
-        new_coins = [c for c in all_coins if c["id"] not in market_ids][-limit:]
-        new_coins.reverse()
-        results = []
-        for coin in new_coins:
-            cid = coin.get("id", "")
-            results.append({
-                "name": coin.get("name", "N/A"),
-                "symbol": coin.get("symbol", "N/A").upper(),
-                "id": cid,
-                "link": f"https://www.coingecko.com/en/coins/{cid}",
-            })
-        if not results:
-            top = market_coins[-limit:]
-            top.reverse()
-            for c in top:
+    try:
+        async with aiohttp.ClientSession() as session:
+            url = f"{COINGECKO_BASE}/coins/list"
+            async with session.get(url) as resp:
+                if resp.status != 200:
+                    return []
+                all_coins = await resp.json()
+            url2 = f"{COINGECKO_BASE}/coins/markets"
+            params = {
+                "vs_currency": "usd",
+                "order": "market_cap_desc",
+                "per_page": 250,
+                "page": 1,
+                "sparkline": "false",
+            }
+            async with session.get(url2, params=params) as resp:
+                if resp.status != 200:
+                    return []
+                market_coins = await resp.json()
+            market_ids = {c["id"] for c in market_coins}
+            new_coins = [c for c in all_coins if c["id"] not in market_ids][-limit:]
+            new_coins.reverse()
+            results = []
+            for coin in new_coins:
+                cid = coin.get("id", "")
+                results.append({
+                    "name": coin.get("name", "N/A"),
+                    "symbol": coin.get("symbol", "N/A").upper(),
+                    "id": cid,
+                    "link": f"https://www.coingecko.com/en/coins/{cid}",
+                })
+            if not results:
+                top = market_coins[-limit:]
+                top.reverse()
+                for c in top:
+                    cid = c.get("id", "")
+                    results.append({
+                        "name": c.get("name", "N/A"),
+                        "symbol": c.get("symbol", "N/A").upper(),
+                        "price": c.get("current_price", 0),
+                        "change_24h": c.get("price_change_percentage_24h", 0),
+                        "market_cap": c.get("market_cap", 0),
+                        "link": f"https://www.coingecko.com/en/coins/{cid}",
+                    })
+            return results
+    except Exception:
+        return []
+
+
+async def fetch_top_gainers(limit=10):
+    try:
+        async with aiohttp.ClientSession() as session:
+            url = f"{COINGECKO_BASE}/coins/markets"
+            params = {
+                "vs_currency": "usd",
+                "order": "market_cap_desc",
+                "per_page": 250,
+                "page": 1,
+                "sparkline": "false",
+            }
+            async with session.get(url, params=params) as resp:
+                if resp.status != 200:
+                    return []
+                coins = await resp.json()
+            for c in coins:
+                c["change_24h"] = c.get("price_change_percentage_24h") or 0
+            coins.sort(key=lambda x: x["change_24h"], reverse=True)
+            results = []
+            for c in coins[:limit]:
                 cid = c.get("id", "")
                 results.append({
                     "name": c.get("name", "N/A"),
                     "symbol": c.get("symbol", "N/A").upper(),
                     "price": c.get("current_price", 0),
-                    "change_24h": c.get("price_change_percentage_24h", 0),
+                    "change_24h": c.get("change_24h", 0),
                     "market_cap": c.get("market_cap", 0),
                     "link": f"https://www.coingecko.com/en/coins/{cid}",
                 })
-        return results
-
-
-async def fetch_top_gainers(limit=10):
-    async with aiohttp.ClientSession() as session:
-        url = f"{COINGECKO_BASE}/coins/markets"
-        params = {
-            "vs_currency": "usd",
-            "order": "market_cap_desc",
-            "per_page": 250,
-            "page": 1,
-            "sparkline": "false",
-        }
-        async with session.get(url, params=params) as resp:
-            if resp.status != 200:
-                return []
-            coins = await resp.json()
-        for c in coins:
-            c["change_24h"] = c.get("price_change_percentage_24h") or 0
-        coins.sort(key=lambda x: x["change_24h"], reverse=True)
-        results = []
-        for c in coins[:limit]:
-            cid = c.get("id", "")
-            results.append({
-                "name": c.get("name", "N/A"),
-                "symbol": c.get("symbol", "N/A").upper(),
-                "price": c.get("current_price", 0),
-                "change_24h": c.get("change_24h", 0),
-                "market_cap": c.get("market_cap", 0),
-                "link": f"https://www.coingecko.com/en/coins/{cid}",
-            })
-        return results
+            return results
+    except Exception:
+        return []
 
 
 async def fetch_trending():
-    async with aiohttp.ClientSession() as session:
-        url = f"{COINGECKO_BASE}/search/trending"
-        async with session.get(url) as resp:
-            if resp.status != 200:
-                return []
-            data = await resp.json()
-        results = []
-        for item in data.get("coins", [])[:10]:
-            coin = item.get("item", {})
-            cid = coin.get("id", "")
-            results.append({
-                "name": coin.get("name", "N/A"),
-                "symbol": coin.get("symbol", "N/A").upper(),
-                "market_cap_rank": coin.get("market_cap_rank", "N/A"),
-                "score": coin.get("score", 0),
-                "link": f"https://www.coingecko.com/en/coins/{cid}",
-            })
-        return results
+    try:
+        async with aiohttp.ClientSession() as session:
+            url = f"{COINGECKO_BASE}/search/trending"
+            async with session.get(url) as resp:
+                if resp.status != 200:
+                    return []
+                data = await resp.json()
+            results = []
+            for item in data.get("coins", [])[:10]:
+                coin = item.get("item", {})
+                cid = coin.get("id", "")
+                results.append({
+                    "name": coin.get("name", "N/A"),
+                    "symbol": coin.get("symbol", "N/A").upper(),
+                    "market_cap_rank": coin.get("market_cap_rank", "N/A"),
+                    "score": coin.get("score", 0),
+                    "link": f"https://www.coingecko.com/en/coins/{cid}",
+                })
+            return results
+    except Exception:
+        return []
 
 
 AIRDROP_LIST = [
@@ -1326,7 +1335,7 @@ def format_verify(title, body="", source=""):
 
 def format_new_coins(coins):
     if not coins:
-        return "Aucune nouvelle crypto trouvee."
+        return "*\U0001f195 Nouvelles Cryptomonnaies*\n\n_L'API CoinGecko n'est pas accessible depuis ce serveur.\nReessayez plus tard ou verifiez directement sur coingecko.com._"
     msg = f"*\U0001f195 Nouvelles Cryptomonnaies - {datetime.now().strftime('%d/%m/%Y')}*\n\n"
     for i, c in enumerate(coins, 1):
         name = md_escape(c.get("name", "N/A"))
@@ -1354,7 +1363,7 @@ def format_new_coins(coins):
 
 def format_top_gainers(coins):
     if not coins:
-        return "Aucun top gainers trouve."
+        return "*\U0001f4c8 Top Gainers 24h*\n\n_L'API CoinGecko n'est pas accessible depuis ce serveur.\nReessayez plus tard ou verifiez directement sur coingecko.com._"
     msg = f"*\U0001f4c8 Top Gainers 24h - {datetime.now().strftime('%d/%m/%Y')}*\n\n"
     for i, c in enumerate(coins, 1):
         name = md_escape(c.get("name", "N/A"))
@@ -1375,7 +1384,7 @@ def format_top_gainers(coins):
 
 def format_trending(coins):
     if not coins:
-        return "Aucun trending trouve."
+        return "*\U0001f525 Crypto Trending*\n\n_L'API CoinGecko n'est pas accessible depuis ce serveur.\nReessayez plus tard ou verifiez directement sur coingecko.com._"
     msg = f"*\U0001f525 Crypto Trending - {datetime.now().strftime('%d/%m/%Y')}*\n\n"
     for i, c in enumerate(coins, 1):
         name = md_escape(c.get("name", "N/A"))

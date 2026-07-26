@@ -39,6 +39,16 @@ from crypto_fetcher import (
 
 load_dotenv()
 
+if "PYTHONANYWHERE_DOMAIN" in os.environ:
+    PA_PROXY = "http://proxy.pythonanywhere.com:8080"
+    os.environ["HTTP_PROXY"] = PA_PROXY
+    os.environ["HTTPS_PROXY"] = PA_PROXY
+    os.environ["http_proxy"] = PA_PROXY
+    os.environ["https_proxy"] = PA_PROXY
+    os.environ["NO_PROXY"] = ""
+    os.environ["no_proxy"] = ""
+    print("Proxy PythonAnywhere active")
+
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 MAX_MSG = 4000

@@ -18,6 +18,14 @@ SEEN_FILE = Path(__file__).parent / "seen_news.json"
 NS_MEDIA = {"media": "http://search.yahoo.com/mrss/"}
 NS_CONTENT = {"content": "http://purl.org/rss/1.0/modules/content/"}
 
+PROXY_URL = os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy") or ""
+
+
+def get_proxy():
+    if PROXY_URL:
+        return PROXY_URL
+    return None
+
 
 FR_DICTIONARY = {
     "bitcoin": "Bitcoin", "ethereum": "Ethereum", "crypto": "crypto",
@@ -273,7 +281,7 @@ async def translate_to_french(text):
     try:
         encoded = quote(text[:5000])
         url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=fr&dt=t&q={encoded}"
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(trust_env=True) as session:
             async with session.get(url, timeout=aiohttp.ClientTimeout(total=8)) as resp:
                 if resp.status == 200:
                     data = await resp.json()
@@ -520,7 +528,7 @@ def is_trump_crypto(title, body=""):
 async def fetch_cryptopanic_news(limit=15):
     results = []
     try:
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(trust_env=True) as session:
             url = f"{CRYPTOPANIC_BASE}/posts/?filter=hot&public=true"
             async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
                 if resp.status != 200:
@@ -544,7 +552,7 @@ async def fetch_cryptopanic_news(limit=15):
 async def fetch_cryptocompare_news(limit=15):
     results = []
     try:
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(trust_env=True) as session:
             url = f"{CRYPTOCOMPARE_BASE}/news/?lang=EN&sortOrder=latest"
             async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
                 if resp.status != 200:
@@ -567,7 +575,7 @@ async def fetch_cryptocompare_news(limit=15):
 async def fetch_coindesk_rss(limit=10):
     results = []
     try:
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(trust_env=True) as session:
             url = "https://www.coindesk.com/arc/outboundfeeds/rss/"
             async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
                 if resp.status != 200:
@@ -596,7 +604,7 @@ async def fetch_coindesk_rss(limit=10):
 async def fetch_cointelegraph_rss(limit=10):
     results = []
     try:
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(trust_env=True) as session:
             url = "https://cointelegraph.com/rss"
             async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
                 if resp.status != 200:
@@ -625,7 +633,7 @@ async def fetch_cointelegraph_rss(limit=10):
 async def fetch_bitcoin_mag_rss(limit=10):
     results = []
     try:
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(trust_env=True) as session:
             url = "https://bitcoinmagazine.com/.rss/full/"
             async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
                 if resp.status != 200:
@@ -654,7 +662,7 @@ async def fetch_bitcoin_mag_rss(limit=10):
 async def fetch_theblock_rss(limit=10):
     results = []
     try:
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(trust_env=True) as session:
             url = "https://www.theblock.co/rss.xml"
             async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
                 if resp.status != 200:
@@ -683,7 +691,7 @@ async def fetch_theblock_rss(limit=10):
 async def fetch_decrypt_rss(limit=10):
     results = []
     try:
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(trust_env=True) as session:
             url = "https://decrypt.co/feed"
             async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
                 if resp.status != 200:
@@ -712,7 +720,7 @@ async def fetch_decrypt_rss(limit=10):
 async def fetch_reuters_rss(limit=10):
     results = []
     try:
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(trust_env=True) as session:
             url = "https://www.reuters.com/arc/outboundfeeds/v3/all/byCategoryTopics/?outputType=xml&size=10"
             async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
                 if resp.status != 200:
@@ -745,7 +753,7 @@ async def fetch_reuters_rss(limit=10):
 async def fetch_bloomberg_rss(limit=10):
     results = []
     try:
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(trust_env=True) as session:
             url = "https://feeds.bloomberg.com/markets/news.rss"
             async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
                 if resp.status != 200:
@@ -863,7 +871,7 @@ async def verify_news(title, body="", source=""):
 
 async def fetch_new_coins(limit=10):
     try:
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(trust_env=True) as session:
             url = f"{COINGECKO_BASE}/coins/list"
             async with session.get(url) as resp:
                 if resp.status != 200:
@@ -913,7 +921,7 @@ async def fetch_new_coins(limit=10):
 
 async def fetch_top_gainers(limit=10):
     try:
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(trust_env=True) as session:
             url = f"{COINGECKO_BASE}/coins/markets"
             params = {
                 "vs_currency": "usd",
@@ -947,7 +955,7 @@ async def fetch_top_gainers(limit=10):
 
 async def fetch_trending():
     try:
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(trust_env=True) as session:
             url = f"{COINGECKO_BASE}/search/trending"
             async with session.get(url) as resp:
                 if resp.status != 200:

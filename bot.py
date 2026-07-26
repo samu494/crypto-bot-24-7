@@ -12,6 +12,7 @@ from telegram.ext import (
     MessageHandler,
     filters,
 )
+from telegram.request import HTTPXRequest
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from crypto_fetcher import (
@@ -39,19 +40,18 @@ from crypto_fetcher import (
 
 load_dotenv()
 
-if "PYTHONANYWHERE_DOMAIN" in os.environ:
+BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+CHAT_ID = os.getenv("CHAT_ID")
+MAX_MSG = 4000
+IS_PYTHONANYWHERE = "PYTHONANYWHERE_DOMAIN" in os.environ
+
+if IS_PYTHONANYWHERE:
     PA_PROXY = "http://proxy.pythonanywhere.com:8080"
     os.environ["HTTP_PROXY"] = PA_PROXY
     os.environ["HTTPS_PROXY"] = PA_PROXY
     os.environ["http_proxy"] = PA_PROXY
     os.environ["https_proxy"] = PA_PROXY
-    os.environ["NO_PROXY"] = ""
-    os.environ["no_proxy"] = ""
-    print("Proxy PythonAnywhere active")
-
-BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-CHAT_ID = os.getenv("CHAT_ID")
-MAX_MSG = 4000
+    print(f"Proxy PythonAnywhere actif: {PA_PROXY}")
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -433,7 +433,17 @@ def main():
         print("ERROR: TELEGRAM_BOT_TOKEN non defini dans .env")
         return
 
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
+    if IS_PYTHONANYWHERE:
+        request = HTTPXRequest(
+            proxy="http://proxy.pythonanywhere.com:8080",
+            connect_timeout=30,
+            read_timeout=30,
+            write_timeout=30,
+            media_write_timeout=30,
+        )
+        app = ApplicationBuilder().token(BOT_TOKEN).request(request).build()
+    else:
+        app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("news", cmd_news))
@@ -461,14 +471,14 @@ def main():
 
     scheduler.start()
 
-    port = int(os.environ.get("PORT", 8000))
-    render_url = os.environ.get("RENDER_EXTERNAL_URL")
-    koyeb_app = os.environ.get("KOYEB_APP")
-
-    if render_url or koyeb_app:
-        print(f"Bot demarre sur le cloud!")
-        print("- Mode polling (health server actif)")
-        start_health_server(port)
+    if IS_PYTHONANYWHERE:
+        print("Bot demarre sur PythonAnywhere!")
+        print("- Proxy actif pour Telegram + news")
+        print("- News auto toutes les 15 min (9 sources)")
+        print("- Whale alertes toutes les 10 min")
+        print("- Economy alertes toutes les 15 min")
+        print("- Trump alertes toutes les 10 min")
+        print("- Resume quotidien a 9h00")
         app.run_polling(allowed_updates=Update.ALL_TYPES)
     else:
         print("Bot demarre en local!")

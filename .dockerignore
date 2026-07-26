@@ -1,0 +1,10 @@
+.env
+__pycache__/
+*.pyc
+*.pyo
+seen_news.json
+.git/
+.gitignore
+render.yaml
+Procfile
+runtime.txt

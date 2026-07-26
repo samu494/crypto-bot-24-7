@@ -453,17 +453,13 @@ def main():
 
     port = int(os.environ.get("PORT", 8000))
     render_url = os.environ.get("RENDER_EXTERNAL_URL")
+    koyeb_app = os.environ.get("KOYEB_APP")
 
-    if render_url:
-        print(f"Bot demarre sur Render! URL: {render_url}")
-        print("- Mode webhook pour production 24/7")
+    if render_url or koyeb_app:
+        print(f"Bot demarre sur le cloud!")
+        print("- Mode polling (health server actif)")
         start_health_server(port)
-        app.run_webhook(
-            listen="0.0.0.0",
-            port=port,
-            url_path=BOT_TOKEN,
-            webhook_url=f"{render_url}/{BOT_TOKEN}",
-        )
+        app.run_polling(allowed_updates=Update.ALL_TYPES)
     else:
         print("Bot demarre en local!")
         print("- News auto toutes les 15 min (9 sources)")

@@ -8,6 +8,7 @@ import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
 from pathlib import Path
 from urllib.parse import urlparse
+from urllib.parse import quote
 
 
 COINGECKO_BASE = "https://api.coingecko.com/api/v3"
@@ -16,6 +17,312 @@ CRYPTOCOMPARE_BASE = "https://min-api.cryptocompare.com/data/v2"
 SEEN_FILE = Path(__file__).parent / "seen_news.json"
 NS_MEDIA = {"media": "http://search.yahoo.com/mrss/"}
 NS_CONTENT = {"content": "http://purl.org/rss/1.0/modules/content/"}
+
+
+FR_DICTIONARY = {
+    "bitcoin": "Bitcoin", "ethereum": "Ethereum", "crypto": "crypto",
+    "cryptocurrency": "cryptomonnaie", "cryptocurrencies": "cryptomonnaies",
+    "blockchain": "blockchain", "defi": "DeFi", "nft": "NFT",
+    "token": "jeton", "tokens": "jetons", "wallet": "portefeuille",
+    "exchange": "exchange", "trading": "trading", "mining": "minage",
+    "staking": "staking", "yield": "rendement", "liquidity": "liquidite",
+    "governance": "gouvernance", "protocol": "protocole", "network": "reseau",
+    "layer": "couche", "mainnet": "mainnet", "testnet": "testnet",
+    "airdrop": "airdrop", "whale": "whale", "whales": "whales",
+    "bullish": "haussier", "bearish": "baissier", "pump": "pump",
+    "dump": "dump", "hodl": "hodl", "market": "marche",
+    "price": "prix", "prices": "prix", "all-time high": "plus haut historique",
+    "ath": "plus haut historique", "market cap": "capitalisation",
+    "volume": "volume", "supply": "offre", "circulating supply": "offre en circulation",
+    "total supply": "offre totale", "max supply": "offre maximale",
+    "partnership": "partenariat", "partnerships": "partenariats",
+    "adoption": "adoption", "regulation": "reglementation",
+    "regulatory": "reglementaire", "ban": "interdiction",
+    "institutional": "institutionnel", "institutional investors": "investisseurs institutionnels",
+    "etf": "ETF", "spot etf": "ETF spot", "approval": "approbation",
+    "sec": "SEC", "cftc": "CFTC", "fed": "Fed", "federal reserve": "Reserve federale",
+    "interest rate": "taux d'interet", "inflation": "inflation",
+    "government": "gouvernement", "congress": "congres", "senate": "senat",
+    "white house": "Maison Blanche", "president": "president",
+    "million": "millions", "billion": "milliards", "billion": "milliards",
+    "hack": "piratage", "hacked": "pirate", "exploit": "exploit",
+    "scam": "arnaque", "fraud": "fraude", "rug pull": "rug pull",
+    "surge": "hausse", "surges": "hausses", "soar": "bondir",
+    "crash": "effondrement", "plunge": "chute", "rally": "rallye",
+    "record": "record", "peak": "pic", "dip": "baisse",
+    "recovery": "recuperation", "breakout": "percée",
+    "launch": "lancement", "launched": "lance", "launches": "lance",
+    "upgrade": "mise a jour", "upgraded": "mis a jour",
+    "integration": "integration", "integrated": "integre",
+    "payment": "paiement", "payments": "paiements",
+    "transfer": "transfert", "transfers": "transferts",
+    "holding": "detention", "holds": "detient", "holdings": "detentions",
+    "acquire": "acquerir", "acquired": "acquis", "acquisition": "acquisition",
+    "announce": "annonce", "announced": "annonce", "announces": "annonce",
+    "confirm": "confirme", "confirmed": "confirme", "confirms": "confirme",
+    "report": "rapport", "reported": "rapporte", "reports": "rapporte",
+    "reveal": "devoile", "revealed": "devoile",
+    "plan": "plan", "plans": "plans", "proposal": "proposition",
+    "proposed": "propose", "approves": "approuve", "approved": "approuve",
+    "reject": "rejette", "rejected": "rejete",
+    "new": "nouveau", "latest": "dernier", "breaking": "urgent",
+    "developing": "en cours", "update": "mise a jour",
+    "company": "entreprise", "companies": "entreprises",
+    "firm": "societe", "firms": "societes",
+    "invest": "investir", "investment": "investissement",
+    "investments": "investissements", "investor": "investisseur",
+    "investors": "investisseurs", "fund": "fonds", "funds": "fonds",
+    "funding": "financement", "raised": "leve", "raise": "lever",
+    "capital": "capital", "venture": "venture",
+    "technology": "technologie", "tech": "techno",
+    "innovation": "innovation", "future": "futur",
+    "security": "securite", "secure": "securise",
+    "global": "mondial", "world": "monde", "country": "pays",
+    "countries": "pays", "europe": "Europe", "united states": "Etats-Unis",
+    "china": "Chine", "japan": "Japon", "india": "Inde",
+    "south korea": "Coree du Sud", "uk": "Royaume-Uni",
+    "africa": "Afrique", "asia": "Asie",
+    "oil": "petrole", "gold": "or", "dollar": "dollar",
+    "euro": "euro", "bonds": "obligations",
+    "stock": "bourse", "stocks": "actions", "index": "indice",
+    "selloff": "vente massive", "sell-off": "vente massive",
+    "buy": "achat", "buying": "achat", "buyers": "acheteurs",
+    "sell": "vente", "selling": "vente", "sellers": "vendeurs",
+    "bull": "haussier", "bear": "baissier",
+    "sentiment": "sentiment", "fear": "peur", "greed": "avidite",
+    "fear and greed": "peur et avidite",
+    "breaking news": "actualite urgente", "just in": "a l'instant",
+    "reportedly": "apparemment", "according to": "selon",
+    "sources say": "des sources affirment", "sources": "sources",
+    "official": "officiel", "officially": "officiellement",
+    "rumor": "rumeur", "rumors": "rumeurs",
+    "potential": "potentiel", "possible": "possible",
+    "likely": "probable", "expected": "attendu",
+    "set to": "devrait", "ready": "pret",
+    "ready to": "pret a", "about to": "sur le point de",
+    "major": "majeur", "massive": "massif", "huge": "enorme",
+    "significant": "significatif", "important": "important",
+    "critical": "critique", "key": "cle",
+    "impact": "impact", "effect": "effet",
+    "result": "resultat", "results": "resultats",
+    "cause": "cause", "causes": "causes",
+    "lead to": "mener a", "leads to": "mene a",
+    "because": "parce que", "since": "depuis",
+    "although": "bien que", "despite": "malgre",
+    "however": "cependant", "but": "mais",
+    "while": "tandis que", "after": "apres",
+    "before": "avant", "during": "pendant",
+    "top": "meilleur", "best": "meilleur", "worst": "pire",
+    "first": "premier", "second": "deuxieme",
+    "third": "troisieme", "last": "dernier",
+    "next": "prochain", "previous": "precedent",
+    "current": "actuel", "year": "annee", "month": "mois",
+    "week": "semaine", "day": "jour", "today": "aujourd'hui",
+    "yesterday": "hier", "tomorrow": "demain",
+    "recently": "recemment", "now": "maintenant",
+    "currently": "actuellement", "already": "deja",
+    "still": "encore", "just": "juste",
+    "reporter": "journaliste", "journalist": "journaliste",
+    "editor": "redacteur", "author": "auteur",
+    "article": "article", "story": "article",
+    "says": "dit", "said": "a dit", "tells": "dit",
+    "claims": "affirme", "argues": "soutient",
+    "suggests": "suggere", "believes": "croit",
+    "thinks": "pense", "expects": "s'attend",
+    "predicts": "predit", "forecasts": "previsionne",
+    "warns": "avertit", "warning": "avertissement",
+    "risk": "risque", "risks": "risques",
+    "opportunity": "opportunite", "opportunities": "opportunites",
+    "challenge": "defi", "challenges": "defis",
+    "problem": "probleme", "problems": "problemes",
+    "solution": "solution", "solutions": "solutions",
+    "growth": "croissance", "growing": "croissant",
+    "expand": "expansion", "expanding": "en expansion",
+    "develop": "developper", "developing": "en developpement",
+    "progress": "progres", "improve": "ameliorer",
+    "improved": "ameliorer", "improvement": "amelioration",
+    "achieve": "atteindre", "achieved": "atteint",
+    "reach": "atteindre", "reached": "attein",
+    "surpass": "depasser", "surpassed": "depasse",
+    "exceed": "depasser", "exceeded": "depasse",
+    "hit": "atteindre", "hits": "attein",
+    "cross": "franchir", "crosses": "franchit",
+    "break": "briser", "breaks": "brise",
+    "support": "support", "resistance": "resistance",
+    "trend": "tendance", "trends": "tendances",
+    "technical": "technique", "fundamental": "fondamental",
+    "analysis": "analyse", "indicator": "indicateur",
+    "signal": "signal", "signals": "signaux",
+    "trade": "transaction", "trades": "transactions",
+    "trader": "trader", "traders": "traders",
+    "profit": "profit", "loss": "perte", "losses": "pertes",
+    "earnings": "gains", "revenue": "revenus",
+    "debt": "dette", "deficit": "deficit",
+    "surplus": "excedent", "budget": "budget",
+    "tax": "impot", "taxes": "impots", "taxation": "fiscalite",
+    "tariff": "tarif", "tariffs": "tarifs",
+    "sanction": "sanction", "sanctions": "sanctions",
+    "war": "guerre", "peace": "paix",
+    "crisis": "crise", "crises": "crises",
+    "recession": "recession", "depression": "depression",
+    "recovery": "recuperation", "boom": "essor",
+    "bubble": "bulle", "collapse": "effondrement",
+    "default": "defaut", "bankruptcy": "faillite",
+    "insolvent": "insolvable", "liquidation": "liquidation",
+    "trillion": "billion", "trillions": "billions",
+    "thousand": "mille", "hundred": "cent",
+    "percent": "pour cent", "basis points": "points de base",
+    "basis point": "point de base", "bps": "pb",
+    "short": "court", "short-term": "court terme",
+    "long": "long", "long-term": "long terme",
+    "longing": "position longue", "shorting": "position courte",
+    "leverage": "levier", "leveraged": "a levier",
+    "liquidate": "liquider", "liquidated": "liquidation",
+    "margin": "marge", "collateral": "collateral",
+    "decentralized": "decentralise", "centralized": "centralise",
+    "peer-to-peer": "pair a pair", "p2p": "pair a pair",
+    "smart contract": "contrat intelligent",
+    "smart contracts": "contrats intelligents",
+    "dapp": "dApp", "dapps": "dApps",
+    "dao": "DAO", "dao": "DAOs",
+    "web3": "Web3", "web 3": "Web3",
+    "metaverse": "metavers", "ai": "IA", "artificial intelligence": "intelligence artificielle",
+    "machine learning": "apprentissage automatique",
+    "privacy": "confidentialite", "anonymous": "anonyme",
+    "identity": "identite", "kyc": "KYC",
+    "aml": "AML", "compliance": "conformite",
+    "legal": "juridique", "law": "loi", "laws": "lois",
+    "court": "tribunal", "lawsuit": "poursuites judiciaires",
+    "settlement": "reglement", "penalty": "penalite",
+    "fine": "amende", "fined": "amende",
+    "charge": "accusation", "charged": "accuse",
+    "guilty": "coupable", "convicted": "condamne",
+    "prison": "prison", "jail": "prison",
+    "sentence": "sentence", "sentenced": "condamne",
+    "release": "liberation", "released": "libere",
+    "arrest": "arrestation", "arrested": "arrete",
+    "investigate": "enqueter", "investigation": "enquete",
+    "probe": "enquete", "raided": "perquisitionne",
+    "seize": "saisir", "seized": "saissi",
+    "confiscate": "confisquer", "confiscated": "confisque",
+    "refund": "remboursement", "reimbursed": "rembourse",
+    "compensate": "indemniser", "compensation": "indemnisation",
+    "victims": "victimes", "affected": "touches",
+    "damage": "dommages", "damages": "dommages",
+    "loss": "perte", "lost": "perdu", "stolen": "vole",
+    "recovered": "recupere", "recovery": "recuperation",
+    "wallet": "portefeuille", "wallets": "portefeuilles",
+    "address": "adresse", "addresses": "adresses",
+    "transaction": "transaction", "transactions": "transactions",
+    "block": "bloc", "blocks": "blocs",
+    "hash": "hash", "mining": "minage",
+    "validator": "validateur", "validators": "validateurs",
+    "consensus": "consensus", "proof of work": "preuve de travail",
+    "proof of stake": "preuve d'enjeu",
+    "node": "nud", "nodes": "nuds",
+    "upgrade": "mise a jour", "fork": "fork",
+    "hard fork": "hard fork", "soft fork": "soft fork",
+    "ecosystem": "ecosysteme", "community": "communaute",
+    "developer": "developpeur", "developers": "developpeurs",
+    "team": "equipe", "founder": "fondateur", "founders": "fondateurs",
+    "ceo": "PDG", "cto": "CTO",
+    "update": "mise a jour", "roadmap": "feuille de route",
+    "milestone": "jalon", "milestones": "jalons",
+    "benchmark": "reference", "performance": "performance",
+    "speed": "vitesse", "fast": "rapide", "faster": "plus rapide",
+    "scalability": "evolutivite", "scalable": "evolutif",
+    "throughput": "debit", "latency": "latence",
+    "fee": "frais", "fees": "frais",
+    "cost": "cout", "cheap": "pas cher",
+    "expensive": "cher", "free": "gratuit",
+    "bonus": "bonus", "reward": "recompense",
+    "rewards": "recompenses", "incentive": "incitation",
+    "incentives": "incitations", "earn": "gagner",
+    "earnings": "gains", "income": "revenu",
+    "salary": "salaire", "wage": "salaire",
+    "spending": "depenses", "expenses": "depenses",
+    "saving": "epargne", "savings": "epargnes",
+    "cost": "cout", "price": "prix",
+    "value": "valeur", "worth": "valeur",
+    "valuation": "valorisation",
+    "fundraising": "collecte de fonds",
+    "ico": "ICO", "ido": "IDO", "ieo": "IEO",
+    "presale": "presale", "pre-sale": "presale",
+    "seed round": "tour graine", "series a": "serie A",
+    "venture capital": "capital-risque",
+    "hedge fund": "fonds de couverture",
+    "asset management": "gestion d'actifs",
+    "wealth management": "gestion de patrimoine",
+    "broker": "courtier", "exchange": "exchange",
+    "custody": "custody", "custodian": "custodian",
+    "deposits": "depots", "withdrawals": "retraits",
+    "buy": "achat", "sell": "vente",
+    "order": "ordre", "orders": "ordres",
+    "limit order": "ordre limite", "market order": "ordre au marche",
+    "stop loss": "stop loss", "take profit": "take profit",
+    "portfolio": "portefeuille", "allocation": "allocation",
+    "diversification": "diversification",
+    "risk management": "gestion des risques",
+    "strategy": "strategie", "strategies": "strategies",
+}
+
+
+async def translate_to_french(text):
+    if not text:
+        return text
+    try:
+        encoded = quote(text[:5000])
+        url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=fr&dt=t&q={encoded}"
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=8)) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    translated = ""
+                    for part in data[0]:
+                        if part[0]:
+                            translated += part[0]
+                    if translated and len(translated) > 10:
+                        return translated
+    except Exception:
+        pass
+    return text
+
+
+def dict_translate(text):
+    if not text:
+        return text
+    words = text.split()
+    result = []
+    for word in words:
+        lower = word.lower().strip(".,;:!?\"'()-")
+        if lower in FR_DICTIONARY:
+            replacement = FR_DICTIONARY[lower]
+            if word[0].isupper():
+                replacement = replacement.capitalize()
+            result.append(replacement)
+        else:
+            result.append(word)
+    return " ".join(result)
+
+
+async def translate_news_item(item):
+    title = item.get("title", "")
+    body = item.get("body", "")
+    if title:
+        translated_title = await translate_to_french(title)
+        if translated_title and translated_title != title:
+            item["title"] = translated_title
+            item["original_title"] = title
+        else:
+            item["title"] = dict_translate(title)
+    if body:
+        translated_body = await translate_to_french(body)
+        if translated_body and translated_body != body:
+            item["body"] = translated_body
+            item["original_body"] = body
+        else:
+            item["body"] = dict_translate(body)
+    return item
 
 
 def load_seen():
@@ -147,7 +454,7 @@ def analyze_credibility(title, body="", source=""):
 
     if any(w in full_text for w in ["confirmed", "official", "announced", "verified", "confirme", "officiel", "annonce"]):
         score += 10
-        reasons.append("Termes officiels detectes dans l'article")
+        reasons.append("Termes officiels detectes")
 
     if any(w in full_text for w in ["rumor", "rumour", "reportedly", "allegedly", "unconfirmed", "rumeur", "non confirme", "selon des sources"]):
         score -= 15
@@ -155,9 +462,9 @@ def analyze_credibility(title, body="", source=""):
 
     if any(w in full_text for w in ["hack", "exploit", "rug pull", "scam", "fraud", "piratage", "arnaque"]):
         score -= 10
-        reasons.append("Contexte negatif: possible incident de securite")
+        reasons.append("Contexte negatif: possible incident")
 
-    if any(w in full_text for w in ["partnership", "listing", "upgrade", "mainnet", "partenariat", "listing", "mise a jour"]):
+    if any(w in full_text for w in ["partnership", "listing", "upgrade", "mainnet", "partenariat", "mise a jour"]):
         score += 10
         reasons.append("Evenement positif pour le projet")
 
@@ -165,7 +472,7 @@ def analyze_credibility(title, body="", source=""):
         score += 15
         reasons.append("Source de premier plan international")
 
-    if any(w in full_text for w in ["sec", "cftc", "regulation", "regulation", "reglementation", "ban", "interdiction"]):
+    if any(w in full_text for w in ["sec", "cftc", "regulation", "reglementation", "ban", "interdiction"]):
         score += 5
         reasons.append("Contexte regulatorie important")
 
@@ -250,7 +557,7 @@ async def fetch_cryptocompare_news(limit=15):
                     "published": item.get("published_on", ""),
                     "url": item.get("url", ""),
                     "currencies": [item.get("categories", "")],
-                    "body": item.get("body", "")[:300],
+                    "body": item.get("body", "")[:500],
                 })
     except Exception:
         pass
@@ -278,7 +585,7 @@ async def fetch_coindesk_rss(limit=10):
                     "published": item.findtext("pubDate", ""),
                     "url": link,
                     "currencies": [],
-                    "body": (item.findtext("description", "") or "")[:300],
+                    "body": (item.findtext("description", "") or "")[:500],
                     "image": image,
                 })
     except Exception:
@@ -307,7 +614,7 @@ async def fetch_cointelegraph_rss(limit=10):
                     "published": item.findtext("pubDate", ""),
                     "url": link,
                     "currencies": [],
-                    "body": (item.findtext("description", "") or "")[:300],
+                    "body": (item.findtext("description", "") or "")[:500],
                     "image": image,
                 })
     except Exception:
@@ -336,7 +643,7 @@ async def fetch_bitcoin_mag_rss(limit=10):
                     "published": item.findtext("pubDate", ""),
                     "url": link,
                     "currencies": ["BTC"],
-                    "body": (item.findtext("description", "") or "")[:300],
+                    "body": (item.findtext("description", "") or "")[:500],
                     "image": image,
                 })
     except Exception:
@@ -354,7 +661,6 @@ async def fetch_theblock_rss(limit=10):
                     return []
                 text = await resp.text()
             root = ET.fromstring(text)
-            ns = {"dc": "http://purl.org/dc/elements/1.1/"}
             for item in root.findall(".//item")[:limit]:
                 image = extract_image_from_rss(item)
                 link = item.findtext("link", "")
@@ -366,7 +672,7 @@ async def fetch_theblock_rss(limit=10):
                     "published": "",
                     "url": link,
                     "currencies": [],
-                    "body": (item.findtext("description", "") or "")[:300],
+                    "body": (item.findtext("description", "") or "")[:500],
                     "image": image,
                 })
     except Exception:
@@ -395,7 +701,7 @@ async def fetch_decrypt_rss(limit=10):
                     "published": item.findtext("pubDate", ""),
                     "url": link,
                     "currencies": [],
-                    "body": (item.findtext("description", "") or "")[:300],
+                    "body": (item.findtext("description", "") or "")[:500],
                     "image": image,
                 })
     except Exception:
@@ -428,7 +734,7 @@ async def fetch_reuters_rss(limit=10):
                         "published": item.findtext("pubDate", ""),
                         "url": link,
                         "currencies": [],
-                        "body": body[:300],
+                        "body": body[:500],
                         "image": image,
                     })
     except Exception:
@@ -461,7 +767,7 @@ async def fetch_bloomberg_rss(limit=10):
                         "published": item.findtext("pubDate", ""),
                         "url": link,
                         "currencies": [],
-                        "body": body[:300],
+                        "body": body[:500],
                         "image": image,
                     })
     except Exception:
@@ -489,11 +795,17 @@ async def fetch_all_news_raw(limit=30):
     return all_news
 
 
+async def translate_news_batch(news_list):
+    tasks = [translate_news_item(n) for n in news_list]
+    translated = await asyncio.gather(*tasks, return_exceptions=True)
+    return [n for n in translated if isinstance(n, dict)]
+
+
 def dedup_news(news_list):
     seen = load_seen()
     fresh = []
     for n in news_list:
-        h = news_hash(n["title"])
+        h = news_hash(n.get("title", ""))
         if h not in seen:
             seen[h] = datetime.now().isoformat()
             fresh.append(n)
@@ -507,7 +819,9 @@ def dedup_news(news_list):
 
 async def fetch_all_news(limit=15):
     all_news = await fetch_all_news_raw(limit)
-    return dedup_news(all_news)[:limit]
+    fresh = dedup_news(all_news)[:limit]
+    translated = await translate_news_batch(fresh)
+    return translated
 
 
 async def fetch_whale_news(limit=10):
@@ -516,7 +830,9 @@ async def fetch_whale_news(limit=10):
     for n in all_news:
         if is_whale_news(n.get("title", ""), n.get("body", "")):
             whale_news.append(n)
-    return dedup_news(whale_news)[:limit]
+    fresh = dedup_news(whale_news)[:limit]
+    translated = await translate_news_batch(fresh)
+    return translated
 
 
 async def fetch_economy_news(limit=10):
@@ -525,7 +841,9 @@ async def fetch_economy_news(limit=10):
     for n in all_news:
         if is_economy_news(n.get("title", ""), n.get("body", "")):
             economy_news.append(n)
-    return dedup_news(economy_news)[:limit]
+    fresh = dedup_news(economy_news)[:limit]
+    translated = await translate_news_batch(fresh)
+    return translated
 
 
 async def fetch_trump_crypto(limit=10):
@@ -534,7 +852,9 @@ async def fetch_trump_crypto(limit=10):
     for n in all_news:
         if is_trump_crypto(n.get("title", ""), n.get("body", "")):
             trump_news.append(n)
-    return dedup_news(trump_news)[:limit]
+    fresh = dedup_news(trump_news)[:limit]
+    translated = await translate_news_batch(fresh)
+    return translated
 
 
 async def verify_news(title, body="", source=""):
@@ -861,25 +1181,38 @@ PROMISING_PROJECTS = [
 ]
 
 
+def _format_single_news(i, n, show_image=True):
+    currencies = ", ".join(n.get("currencies", [])[:3])
+    cur_tag = f" [{currencies}]" if currencies else ""
+    analysis = analyze_credibility(n.get("title", ""), n.get("body", ""), n.get("source", ""))
+    msg = f"*{i}. {n['title']}*{cur_tag}\n"
+    msg += f"   {analysis['icon']} Fiabilite: {analysis['verdict']} ({analysis['score']}/100)\n"
+    msg += f"   \U0001f4dd Source: {n.get('source', 'N/A')}\n"
+    published = n.get("published", "")
+    if published:
+        msg += f"   \U0001f4c5 Publie le: {published}\n"
+    if n.get("body"):
+        body = n["body"][:450].replace("\n", " ").strip()
+        if len(n["body"]) > 450:
+            body += "..."
+        msg += f"   \U0001f4dd Resume detaille:\n      {body}\n"
+    if analysis["reasons"]:
+        msg += f"   \U0001f4a1 Analyse:\n"
+        for r in analysis["reasons"][:3]:
+            msg += f"      - {r}\n"
+    if n.get("url"):
+        msg += f"   \U0001f517 Source originale: {n['url']}\n"
+    msg += "\n"
+    return msg
+
+
 def format_news(news_list):
     if not news_list:
         return "\U0001f50d Aucune nouvelle crypto pour le moment."
     msg = f"*\U0001f4f0 News Crypto - {datetime.now().strftime('%d/%m %H:%M')}*\n\n"
     for i, n in enumerate(news_list[:10], 1):
-        currencies = ", ".join(n.get("currencies", [])[:3])
-        cur_tag = f" [{currencies}]" if currencies else ""
-        analysis = analyze_credibility(n.get("title", ""), n.get("body", ""), n.get("source", ""))
-        msg += f"*{i}. {n['title']}*{cur_tag}\n"
-        msg += f"   {analysis['icon']} Fiabilite: {analysis['verdict']} ({analysis['score']}/100)\n"
-        msg += f"   \U0001f4dd Source: {n.get('source', 'N/A')}\n"
-        if n.get("body"):
-            body = n["body"][:200].replace("\n", " ").strip()
-            msg += f"   \U0001f4dd Resume: {body}...\n"
-        if analysis["reasons"]:
-            msg += f"   \U0001f4a1 Analyse: {'; '.join(analysis['reasons'][:2])}\n"
-        if n.get("url"):
-            msg += f"   \U0001f517 Lien: {n['url']}\n"
-        msg += "\n"
+        msg += _format_single_news(i, n)
+    msg += "_Toutes les sources sont traduites en francais automatiquement._"
     return msg
 
 
@@ -894,20 +1227,8 @@ def format_news_with_images(news_list):
 
     msg = f"*\U0001f4f0 News Crypto - {datetime.now().strftime('%d/%m %H:%M')}*\n\n"
     for i, n in enumerate(news_list[:10], 1):
-        currencies = ", ".join(n.get("currencies", [])[:3])
-        cur_tag = f" [{currencies}]" if currencies else ""
-        analysis = analyze_credibility(n.get("title", ""), n.get("body", ""), n.get("source", ""))
-        msg += f"*{i}. {n['title']}*{cur_tag}\n"
-        msg += f"   {analysis['icon']} Fiabilite: {analysis['verdict']} ({analysis['score']}/100)\n"
-        msg += f"   \U0001f4dd Source: {n.get('source', 'N/A')}\n"
-        if n.get("body"):
-            body = n["body"][:200].replace("\n", " ").strip()
-            msg += f"   \U0001f4dd Resume: {body}...\n"
-        if analysis["reasons"]:
-            msg += f"   \U0001f4a1 Analyse: {'; '.join(analysis['reasons'][:2])}\n"
-        if n.get("url"):
-            msg += f"   \U0001f517 Lien: {n['url']}\n"
-        msg += "\n"
+        msg += _format_single_news(i, n)
+    msg += "_Toutes les sources sont traduites en francais automatiquement._"
 
     img_url = first_with_image.get("image") if first_with_image else None
     return img_url, msg
@@ -923,20 +1244,10 @@ def format_whale_news(news_list):
             break
 
     msg = f"*\U0001f40b News Whales (Gros Detenteurs) - {datetime.now().strftime('%d/%m %H:%M')}*\n\n"
-    msg += "_Les whales sont les gros porteurs de crypto qui bougent des millions._\n\n"
+    msg += "_Les whales sont les gros porteurs de crypto qui bougent des millions._\n"
+    msg += "_Ces mouvements peuvent indiquer des tendances haussieres ou baissieres._\n\n"
     for i, n in enumerate(news_list[:10], 1):
-        analysis = analyze_credibility(n.get("title", ""), n.get("body", ""), n.get("source", ""))
-        msg += f"*{i}. {n['title']}*\n"
-        msg += f"   {analysis['icon']} Fiabilite: {analysis['verdict']} ({analysis['score']}/100)\n"
-        msg += f"   \U0001f4dd Source: {n.get('source', 'N/A')}\n"
-        if n.get("body"):
-            body = n["body"][:200].replace("\n", " ").strip()
-            msg += f"   \U0001f4dd Resume: {body}...\n"
-        if analysis["reasons"]:
-            msg += f"   \U0001f4a1 Analyse: {'; '.join(analysis['reasons'][:2])}\n"
-        if n.get("url"):
-            msg += f"   \U0001f517 Lien: {n['url']}\n"
-        msg += "\n"
+        msg += _format_single_news(i, n)
 
     img_url = first_with_image.get("image") if first_with_image else None
     return img_url, msg
@@ -952,20 +1263,10 @@ def format_economy_news(news_list):
             break
 
     msg = f"*\U0001f3e2 Economie Crypto - {datetime.now().strftime('%d/%m %H:%M')}*\n\n"
-    msg += "_Regulations, adoptions, decisions gouvernementales, marches._\n\n"
+    msg += "_Regulations, adoptions, decisions gouvernementales, marches._\n"
+    msg += "_Ces nouvelles impactent directement les prix et l'adoption._\n\n"
     for i, n in enumerate(news_list[:10], 1):
-        analysis = analyze_credibility(n.get("title", ""), n.get("body", ""), n.get("source", ""))
-        msg += f"*{i}. {n['title']}*\n"
-        msg += f"   {analysis['icon']} Fiabilite: {analysis['verdict']} ({analysis['score']}/100)\n"
-        msg += f"   \U0001f4dd Source: {n.get('source', 'N/A')}\n"
-        if n.get("body"):
-            body = n["body"][:200].replace("\n", " ").strip()
-            msg += f"   \U0001f4dd Resume: {body}...\n"
-        if analysis["reasons"]:
-            msg += f"   \U0001f4a1 Analyse: {'; '.join(analysis['reasons'][:2])}\n"
-        if n.get("url"):
-            msg += f"   \U0001f517 Lien: {n['url']}\n"
-        msg += "\n"
+        msg += _format_single_news(i, n)
 
     img_url = first_with_image.get("image") if first_with_image else None
     return img_url, msg
@@ -981,20 +1282,10 @@ def format_trump_news(news_list):
             break
 
     msg = f"*\U0001f1fa\U0001f1f8 Annonces Trump + Crypto - {datetime.now().strftime('%d/%m %H:%M')}*\n\n"
-    msg += "_Tout ce que dit et fait Trump sur les cryptomonnaies._\n\n"
+    msg += "_Tout ce que dit et fait Trump sur les cryptomonnaies._\n"
+    msg += "_Les decisions politiques US impactent fortement le marche crypto._\n\n"
     for i, n in enumerate(news_list[:10], 1):
-        analysis = analyze_credibility(n.get("title", ""), n.get("body", ""), n.get("source", ""))
-        msg += f"*{i}. {n['title']}*\n"
-        msg += f"   {analysis['icon']} Fiabilite: {analysis['verdict']} ({analysis['score']}/100)\n"
-        msg += f"   \U0001f4dd Source: {n.get('source', 'N/A')}\n"
-        if n.get("body"):
-            body = n["body"][:200].replace("\n", " ").strip()
-            msg += f"   \U0001f4dd Resume: {body}...\n"
-        if analysis["reasons"]:
-            msg += f"   \U0001f4a1 Analyse: {'; '.join(analysis['reasons'][:2])}\n"
-        if n.get("url"):
-            msg += f"   \U0001f517 Lien: {n['url']}\n"
-        msg += "\n"
+        msg += _format_single_news(i, n)
 
     img_url = first_with_image.get("image") if first_with_image else None
     return img_url, msg
@@ -1032,12 +1323,16 @@ def format_new_coins(coins):
             change = c.get("change_24h", 0) or 0
             arrow = "+" if change >= 0 else ""
             msg += f"*{i}. {c['name']} ({c['symbol']})*\n"
-            msg += f"   \U0001f4b0 {price_str} | {arrow}{change:.1f}%\n"
+            msg += f"   \U0001f4b0 Prix: {price_str} | Variation 24h: {arrow}{change:.1f}%\n"
+            mc = c.get("market_cap")
+            if mc:
+                msg += f"   \U0001f3e6 Capitalisation: ${mc:,.0f}\n"
             if c.get("link"):
                 msg += f"   \U0001f517 {c['link']}\n"
             msg += "\n"
         else:
             msg += f"*{i}. {c['name']} ({c['symbol']})*\n"
+            msg += f"   \U0001f4cb Nouveau, pas encore de prix disponible\n"
             if c.get("link"):
                 msg += f"   \U0001f517 {c['link']}\n"
             msg += "\n"
@@ -1053,7 +1348,10 @@ def format_top_gainers(coins):
         price = c.get("price", 0) or 0
         price_str = f"${price:,.6f}" if price < 1 else f"${price:,.2f}"
         msg += f"*{i}. {c['name']} ({c['symbol']})*\n"
-        msg += f"   \U0001f4b0 {price_str} | \U0001f7e2 +{change:.1f}%\n"
+        msg += f"   \U0001f4b0 Prix: {price_str} | \U0001f7e2 +{change:.1f}%\n"
+        mc = c.get("market_cap")
+        if mc:
+            msg += f"   \U0001f3e6 Capitalisation: ${mc:,.0f}\n"
         if c.get("link"):
             msg += f"   \U0001f517 {c['link']}\n"
         msg += "\n"
@@ -1067,7 +1365,7 @@ def format_trending(coins):
     for i, c in enumerate(coins, 1):
         msg += f"*{i}. {c['name']} ({c['symbol']})*\n"
         if c.get("market_cap_rank"):
-            msg += f"   \U0001f3c6 Rang: #{c['market_cap_rank']}\n"
+            msg += f"   \U0001f3c6 Rang capitalisation: #{c['market_cap_rank']}\n"
         if c.get("link"):
             msg += f"   \U0001f517 {c['link']}\n"
         msg += "\n"

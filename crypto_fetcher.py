@@ -20,11 +20,8 @@ NS_CONTENT = {"content": "http://purl.org/rss/1.0/modules/content/"}
 
 PROXY_URL = os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy") or ""
 
-
-def get_proxy():
-    if PROXY_URL:
-        return PROXY_URL
-    return None
+NEWS_CACHE = {"data": None, "timestamp": 0}
+CACHE_TTL = 300
 
 
 FR_DICTIONARY = {
@@ -296,21 +293,18 @@ async def translate_to_french(text):
     return text
 
 
+_SORTED_FR_KEYS = sorted(FR_DICTIONARY.keys(), key=len, reverse=True)
+
+
 def dict_translate(text):
     if not text:
         return text
-    words = text.split()
-    result = []
-    for word in words:
-        lower = word.lower().strip(".,;:!?\"'()-")
-        if lower in FR_DICTIONARY:
-            replacement = FR_DICTIONARY[lower]
-            if word[0].isupper():
-                replacement = replacement.capitalize()
-            result.append(replacement)
-        else:
-            result.append(word)
-    return " ".join(result)
+    result = text
+    for key in _SORTED_FR_KEYS:
+        val = FR_DICTIONARY[key]
+        pattern = re.compile(re.escape(key), re.IGNORECASE)
+        result = pattern.sub(val, result)
+    return result
 
 
 async def translate_news_item(item):
@@ -784,6 +778,10 @@ async def fetch_bloomberg_rss(limit=10):
 
 
 async def fetch_all_news_raw(limit=30):
+    import time
+    now = time.time()
+    if NEWS_CACHE["data"] and (now - NEWS_CACHE["timestamp"]) < CACHE_TTL:
+        return NEWS_CACHE["data"][:limit * 3]
     results = await asyncio.gather(
         fetch_cryptopanic_news(limit),
         fetch_cryptocompare_news(limit),
@@ -800,6 +798,8 @@ async def fetch_all_news_raw(limit=30):
     for r in results:
         if isinstance(r, list):
             all_news.extend(r)
+    NEWS_CACHE["data"] = all_news
+    NEWS_CACHE["timestamp"] = time.time()
     return all_news
 
 
@@ -867,6 +867,24 @@ async def fetch_trump_crypto(limit=10):
 
 async def verify_news(title, body="", source=""):
     return analyze_credibility(title, body, source)
+
+
+async def fetch_quick_price(coin_id="bitcoin"):
+    try:
+        async with aiohttp.ClientSession(trust_env=True) as session:
+            url = f"{COINGECKO_BASE}/simple/price"
+            params = {
+                "ids": f"{coin_id},ethereum,solana,dogecoin,cardano",
+                "vs_currencies": "usd",
+                "include_24hr_change": "true",
+                "include_market_cap": "true",
+            }
+            async with session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                if resp.status != 200:
+                    return {}
+                return await resp.json()
+    except Exception:
+        return {}
 
 
 async def fetch_new_coins(limit=10):
@@ -1490,4 +1508,31 @@ def format_daily_summary(news=None, whale=None, economy=None, trump_news=None, t
     if not any([trump_news, whale, economy, news, trending]):
         msg += "\n_Aucune donnee disponible pour le moment._"
 
+    return msg
+
+
+def format_quick_price(prices):
+    if not prices:
+        return "*\U0001f4b1 Prix Crypto*\n\n_L'API CoinGecko n'est pas accessible._"
+    coins_info = {
+        "bitcoin": ("Bitcoin", "BTC"),
+        "ethereum": ("Ethereum", "ETH"),
+        "solana": ("Solana", "SOL"),
+        "dogecoin": ("Dogecoin", "DOGE"),
+        "cardano": ("Cardano", "ADA"),
+    }
+    msg = f"*\U0001f4b1 Prix Crypto - {datetime.now().strftime('%d/%m %H:%M')}*\n\n"
+    for coin_id, (name, symbol) in coins_info.items():
+        if coin_id in prices:
+            p = prices[coin_id]
+            price = p.get("usd", 0)
+            change = p.get("usd_24h_change", 0) or 0
+            mc = p.get("usd_market_cap", 0)
+            arrow = "\U0001f7e2" if change >= 0 else "\U0001f534"
+            price_str = f"${price:,.6f}" if price < 1 else f"${price:,.2f}"
+            msg += f"*{name} ({symbol})*\n"
+            msg += f"   \U0001f4b0 {price_str} | {arrow} {change:+.2f}%\n"
+            if mc:
+                msg += f"   \U0001f3e6 MC: ${mc:,.0f}\n"
+            msg += "\n"
     return msg

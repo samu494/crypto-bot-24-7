@@ -17,13 +17,19 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from crypto_fetcher import (
     fetch_all_news,
+    fetch_all_news_raw,
     fetch_whale_news,
     fetch_economy_news,
     fetch_trump_crypto,
     fetch_new_coins,
     fetch_top_gainers,
     fetch_trending,
-    format_news,
+    fetch_quick_price,
+    is_whale_news,
+    is_economy_news,
+    is_trump_crypto,
+    dedup_news,
+    translate_news_batch,
     format_news_with_images,
     format_whale_news,
     format_economy_news,
@@ -35,6 +41,7 @@ from crypto_fetcher import (
     format_airdrops,
     format_promising,
     format_daily_summary,
+    format_quick_price,
     md_escape,
 )
 
@@ -61,6 +68,9 @@ logger = logging.getLogger(__name__)
 
 
 async def safe_send(chat_id, text, parse_mode="Markdown", app=None, photo=None):
+    if not app:
+        logger.error("safe_send: app est None, impossible d'envoyer")
+        return
     if len(text) <= MAX_MSG:
         try:
             if photo:
@@ -127,9 +137,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/newcoins - \U0001f195 Nouvelles cryptomonnaies\n"
         "/gainers - \U0001f4c8 Top gainers 24h\n"
         "/trending - \U0001f525 Crypto en tendance\n"
+        "/price - \U0001f4b1 Prix BTC, ETH, SOL, DOGE, ADA\n"
         "/airdrops - \U0001f381 Airdrops serieux avec liens\n"
         "/promising - \U0001f680 Projets prometteurs avec liens\n"
-        "/summary - \U0001f4ca Resume complet\n\n"
+        "/summary - \U0001f4ca Resume complet\n"
+        "/help - \u2139\ufe0f Aide detaillee\n\n"
         "*Fonctionnalites:*\n"
         "\u2022 Chaque news a un resume detaille en francais\n"
         "\u2022 Analyse de fiabilite (VRAI / FAUX / A VERIFIER)\n"
@@ -145,6 +157,39 @@ async def cmd_news(update: Update, context: ContextTypes.DEFAULT_TYPE):
     news = await fetch_all_news(10)
     img_url, msg = format_news_with_images(news)
     await safe_send(update.message.chat_id, msg, app=context.application, photo=img_url)
+
+
+async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = (
+        "*\u2139\ufe0f Aide Crypto Bot*\n\n"
+        "*Commandes disponibles:*\n\n"
+        "/start - \U0001f7e2 Demarrer le bot\n"
+        "/help - \u2139\ufe0f Afficher cette aide\n"
+        "/news - \U0001f4f0 News crypto temps reel\n"
+        "/whales - \U0001f40b News whales (gros detenteurs)\n"
+        "/economy - \U0001f3e2 Economie crypto\n"
+        "/trump - \U0001f1fa\U0001f1f8 Annonces Trump + crypto\n"
+        "/verify - \U0001f50d Verifier fiabilite d'une news\n"
+        "/newcoins - \U0001f195 Nouvelles cryptomonnaies\n"
+        "/gainers - \U0001f4c8 Top gainers 24h\n"
+        "/trending - \U0001f525 Crypto en tendance\n"
+        "/price - \U0001f4b1 Prix BTC, ETH, SOL, DOGE, ADA\n"
+        "/airdrops - \U0001f381 Airdrops serieux avec liens\n"
+        "/promising - \U0001f680 Projets prometteurs avec liens\n"
+        "/summary - \U0001f4ca Resume complet\n\n"
+        "*Texte libre:*\n"
+        "Ecris simplement un mot cle et le bot repond:\n"
+        "whale, news, trump, economy, airdrop, trending, price...\n\n"
+        "_Alertes auto: News 15min | Whales 10min | Economy 15min | Trump 10min_"
+    )
+    await safe_send(update.message.chat_id, msg, app=context.application)
+
+
+async def cmd_price(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await safe_send(update.message.chat_id, "\U0001f4b1 Chargement des prix...", app=context.application)
+    prices = await fetch_quick_price()
+    msg = format_quick_price(prices)
+    await safe_send(update.message.chat_id, msg, app=context.application)
 
 
 async def cmd_whales(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -218,10 +263,11 @@ async def cmd_promising(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def cmd_summary(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await safe_send(update.message.chat_id, "\U0001f4ca Chargement du resume complet...", app=context.application)
-    news = await fetch_all_news(5)
-    whale = await fetch_whale_news(3)
-    economy = await fetch_economy_news(3)
-    trump_news = await fetch_trump_crypto(3)
+    all_news = await fetch_all_news_raw(50)
+    whale = await translate_news_batch(dedup_news([n for n in all_news if is_whale_news(n.get("title", ""), n.get("body", ""))])[:3])
+    economy = await translate_news_batch(dedup_news([n for n in all_news if is_economy_news(n.get("title", ""), n.get("body", ""))])[:3])
+    trump_news = await translate_news_batch(dedup_news([n for n in all_news if is_trump_crypto(n.get("title", ""), n.get("body", ""))])[:3])
+    news = await translate_news_batch(dedup_news(all_news)[:5])
     trending = await fetch_trending()
     msg = format_daily_summary(news, whale, economy, trump_news, trending)
     await safe_send(update.message.chat_id, msg, app=context.application)
@@ -250,6 +296,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await safe_send(chat_id, msg, app=context.application)
     elif any(w in text for w in ["airdrop", "air drops", "gratuit"]):
         msg = format_airdrops()
+        await safe_send(chat_id, msg, app=context.application)
+    elif any(w in text for w in ["prix", "price", "cours", "tarif", "btc", "eth", "sol"]):
+        prices = await fetch_quick_price()
+        msg = format_quick_price(prices)
         await safe_send(chat_id, msg, app=context.application)
     elif any(w in text for w in ["prometteur", "projet", "project"]):
         msg = format_promising()
@@ -290,9 +340,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "/newcoins - \U0001f195 Nouvelles cryptos\n"
             "/gainers - \U0001f4c8 Top gainers\n"
             "/trending - \U0001f525 Tendances\n"
+            "/price - \U0001f4b1 Prix crypto\n"
             "/airdrops - \U0001f381 Airdrops\n"
             "/promising - \U0001f680 Projets prometteurs\n"
-            "/summary - \U0001f4ca Resume"
+            "/summary - \U0001f4ca Resume\n"
+            "/help - \u2139\ufe0f Aide"
         )
         await safe_send(chat_id, msg, app=context.application)
 
@@ -357,10 +409,11 @@ async def daily_notification(app):
     if not CHAT_ID:
         return
     try:
-        news = await fetch_all_news(5)
-        whale = await fetch_whale_news(3)
-        economy = await fetch_economy_news(3)
-        trump_news = await fetch_trump_crypto(3)
+        all_news = await fetch_all_news_raw(50)
+        whale = await translate_news_batch(dedup_news([n for n in all_news if is_whale_news(n.get("title", ""), n.get("body", ""))])[:3])
+        economy = await translate_news_batch(dedup_news([n for n in all_news if is_economy_news(n.get("title", ""), n.get("body", ""))])[:3])
+        trump_news = await translate_news_batch(dedup_news([n for n in all_news if is_trump_crypto(n.get("title", ""), n.get("body", ""))])[:3])
+        news = await translate_news_batch(dedup_news(all_news)[:5])
         trending = await fetch_trending()
 
         from datetime import datetime
@@ -370,7 +423,7 @@ async def daily_notification(app):
         if trump_news:
             msg += "\U0001f1fa\U0001f1f8 *Annonces Trump Crypto:*\n"
             for i, n in enumerate(trump_news[:3], 1):
-                msg += f"{i}. {md_escape(n['title'])}\n"
+                msg += f"{i}. {md_escape(n.get('title', 'N/A'))}\n"
                 if n.get("url"):
                     msg += f"   \U0001f517 {n['url']}\n"
             msg += "\n"
@@ -378,19 +431,19 @@ async def daily_notification(app):
         if whale:
             msg += "\U0001f40b *Whales:*\n"
             for i, n in enumerate(whale[:3], 1):
-                msg += f"{i}. {md_escape(n['title'])}\n"
+                msg += f"{i}. {md_escape(n.get('title', 'N/A'))}\n"
             msg += "\n"
 
         if economy:
             msg += "\U0001f3e2 *Economie:*\n"
             for i, n in enumerate(economy[:3], 1):
-                msg += f"{i}. {md_escape(n['title'])}\n"
+                msg += f"{i}. {md_escape(n.get('title', 'N/A'))}\n"
             msg += "\n"
 
         if news:
             msg += "\U0001f4f0 *News:*\n"
             for i, n in enumerate(news[:3], 1):
-                msg += f"{i}. {md_escape(n['title'])}\n"
+                msg += f"{i}. {md_escape(n.get('title', 'N/A'))}\n"
                 if n.get("url"):
                     msg += f"   \U0001f517 {n['url']}\n"
             msg += "\n"
@@ -398,7 +451,7 @@ async def daily_notification(app):
         if trending:
             msg += "\U0001f525 *Trending:*\n"
             for i, c in enumerate(trending[:5], 1):
-                msg += f"{i}. {c['name']} ({c['symbol']})\n"
+                msg += f"{i}. {md_escape(c.get('name', 'N/A'))} ({md_escape(c.get('symbol', ''))})\n"
             msg += "\n"
 
         msg += format_airdrops() + "\n\n"
@@ -413,6 +466,7 @@ async def daily_notification(app):
 async def post_init(app):
     commands = [
         BotCommand("start", "\U0001f7e2 Demarrer le bot"),
+        BotCommand("help", "\u2139\ufe0f Aide et liste des commandes"),
         BotCommand("news", "\U0001f4f0 News crypto temps reel"),
         BotCommand("whales", "\U0001f40b News whales"),
         BotCommand("economy", "\U0001f3e2 Economie crypto"),
@@ -421,6 +475,7 @@ async def post_init(app):
         BotCommand("newcoins", "\U0001f195 Nouvelles cryptomonnaies"),
         BotCommand("gainers", "\U0001f4c8 Top gainers 24h"),
         BotCommand("trending", "\U0001f525 Crypto en tendance"),
+        BotCommand("price", "\U0001f4b1 Prix BTC, ETH, SOL, DOGE, ADA"),
         BotCommand("airdrops", "\U0001f381 Airdrops serieux"),
         BotCommand("promising", "\U0001f680 Projets prometteurs"),
         BotCommand("summary", "\U0001f4ca Resume complet"),
@@ -446,6 +501,7 @@ def main():
         app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("help", cmd_help))
     app.add_handler(CommandHandler("news", cmd_news))
     app.add_handler(CommandHandler("whales", cmd_whales))
     app.add_handler(CommandHandler("economy", cmd_economy))
@@ -454,6 +510,7 @@ def main():
     app.add_handler(CommandHandler("newcoins", cmd_newcoins))
     app.add_handler(CommandHandler("gainers", cmd_gainers))
     app.add_handler(CommandHandler("trending", cmd_trending))
+    app.add_handler(CommandHandler("price", cmd_price))
     app.add_handler(CommandHandler("airdrops", cmd_airdrops))
     app.add_handler(CommandHandler("promising", cmd_promising))
     app.add_handler(CommandHandler("summary", cmd_summary))

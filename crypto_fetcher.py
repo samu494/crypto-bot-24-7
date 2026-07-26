@@ -1181,25 +1181,34 @@ PROMISING_PROJECTS = [
 ]
 
 
+def md_escape(text):
+    if not text:
+        return ""
+    for ch in ["*", "_", "[", "]", "(", ")", "~", "`", ">", "#", "+", "-", "=", "|", "{", "}", ".", "!"]:
+        text = text.replace(ch, "")
+    return text.strip()
+
+
 def _format_single_news(i, n, show_image=True):
     currencies = ", ".join(n.get("currencies", [])[:3])
     cur_tag = f" [{currencies}]" if currencies else ""
+    title = md_escape(n.get("title", ""))
     analysis = analyze_credibility(n.get("title", ""), n.get("body", ""), n.get("source", ""))
-    msg = f"*{i}. {n['title']}*{cur_tag}\n"
+    msg = f"*{i}. {title}*{cur_tag}\n"
     msg += f"   {analysis['icon']} Fiabilite: {analysis['verdict']} ({analysis['score']}/100)\n"
-    msg += f"   \U0001f4dd Source: {n.get('source', 'N/A')}\n"
+    msg += f"   \U0001f4dd Source: {md_escape(n.get('source', 'N/A'))}\n"
     published = n.get("published", "")
     if published:
         msg += f"   \U0001f4c5 Publie le: {published}\n"
     if n.get("body"):
-        body = n["body"][:450].replace("\n", " ").strip()
+        body = md_escape(n["body"][:450].replace("\n", " ").strip())
         if len(n["body"]) > 450:
             body += "..."
         msg += f"   \U0001f4dd Resume detaille:\n      {body}\n"
     if analysis["reasons"]:
         msg += f"   \U0001f4a1 Analyse:\n"
         for r in analysis["reasons"][:3]:
-            msg += f"      - {r}\n"
+            msg += f"      - {md_escape(r)}\n"
     if n.get("url"):
         msg += f"   \U0001f517 Source originale: {n['url']}\n"
     msg += "\n"

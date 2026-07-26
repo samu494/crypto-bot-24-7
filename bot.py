@@ -34,18 +34,56 @@ from crypto_fetcher import (
     format_airdrops,
     format_promising,
     format_daily_summary,
+    md_escape,
 )
 
 load_dotenv()
 
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
+MAX_MSG = 4000
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO,
 )
 logger = logging.getLogger(__name__)
+
+
+async def safe_send(chat_id, text, parse_mode="Markdown", app=None, photo=None):
+    if len(text) <= MAX_MSG:
+        try:
+            if photo:
+                await app.bot.send_photo(chat_id=chat_id, photo=photo, caption=text, parse_mode=parse_mode)
+            else:
+                await app.bot.send_message(chat_id=chat_id, text=text, parse_mode=parse_mode)
+        except Exception:
+            try:
+                if photo:
+                    await app.bot.send_photo(chat_id=chat_id, photo=photo, caption=text)
+                else:
+                    await app.bot.send_message(chat_id=chat_id, text=text)
+            except Exception as e:
+                logger.error(f"Erreur envoi: {e}")
+        return
+    parts = []
+    while text:
+        if len(text) <= MAX_MSG:
+            parts.append(text)
+            break
+        cut = text.rfind("\n", 0, MAX_MSG)
+        if cut == -1:
+            cut = MAX_MSG
+        parts.append(text[:cut])
+        text = text[cut:].lstrip("\n")
+    for part in parts:
+        try:
+            await app.bot.send_message(chat_id=chat_id, text=part, parse_mode=parse_mode)
+        except Exception:
+            try:
+                await app.bot.send_message(chat_id=chat_id, text=part)
+            except Exception as e:
+                logger.error(f"Erreur envoi morceau: {e}")
 
 
 class HealthHandler(BaseHTTPRequestHandler):
@@ -96,52 +134,29 @@ async def cmd_news(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("\U0001f50d Recherche des news crypto...")
     news = await fetch_all_news(10)
     img_url, msg = format_news_with_images(news)
-    if img_url:
-        try:
-            await update.message.reply_photo(photo=img_url, caption=msg, parse_mode="Markdown")
-            return
-        except Exception:
-            pass
-    await update.message.reply_text(msg, parse_mode="Markdown")
+    chat_id = update.message.chat_id
+    await safe_send(chat_id, msg, app=context.application, photo=img_url)
 
 
 async def cmd_whales(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("\U0001f40b Recherche des news whales...")
     news = await fetch_whale_news(10)
     img_url, msg = format_whale_news(news)
-    if img_url:
-        try:
-            await update.message.reply_photo(photo=img_url, caption=msg, parse_mode="Markdown")
-            return
-        except Exception:
-            pass
-    await update.message.reply_text(msg, parse_mode="Markdown")
+    await safe_send(update.message.chat_id, msg, app=context.application, photo=img_url)
 
 
 async def cmd_economy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("\U0001f3e2 Recherche de l'economie crypto...")
     news = await fetch_economy_news(10)
     img_url, msg = format_economy_news(news)
-    if img_url:
-        try:
-            await update.message.reply_photo(photo=img_url, caption=msg, parse_mode="Markdown")
-            return
-        except Exception:
-            pass
-    await update.message.reply_text(msg, parse_mode="Markdown")
+    await safe_send(update.message.chat_id, msg, app=context.application, photo=img_url)
 
 
 async def cmd_trump(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("\U0001f1fa\U0001f1f8 Recherche des annonces Trump crypto...")
     news = await fetch_trump_crypto(10)
     img_url, msg = format_trump_news(news)
-    if img_url:
-        try:
-            await update.message.reply_photo(photo=img_url, caption=msg, parse_mode="Markdown")
-            return
-        except Exception:
-            pass
-    await update.message.reply_text(msg, parse_mode="Markdown")
+    await safe_send(update.message.chat_id, msg, app=context.application, photo=img_url)
 
 
 async def cmd_verify(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -288,15 +303,8 @@ async def auto_news_check(app):
         news = await fetch_all_news(8)
         if news:
             img_url, msg = format_news_with_images(news)
-            if img_url:
-                try:
-                    await app.bot.send_photo(chat_id=int(CHAT_ID), photo=img_url, caption=msg, parse_mode="Markdown")
-                    logger.info(f"Auto-news avec image envoyee: {len(news)} articles.")
-                    return
-                except Exception:
-                    pass
             msg = "*\U0001f514 Alerte News Crypto!*\n\n" + msg
-            await app.bot.send_message(chat_id=int(CHAT_ID), text=msg, parse_mode="Markdown")
+            await safe_send(int(CHAT_ID), msg, app=app, photo=img_url)
             logger.info(f"Auto-news envoyee: {len(news)} articles.")
     except Exception as e:
         logger.error(f"Erreur auto-news: {e}")
@@ -309,15 +317,8 @@ async def auto_whale_check(app):
         news = await fetch_whale_news(5)
         if news:
             img_url, msg = format_whale_news(news)
-            if img_url:
-                try:
-                    await app.bot.send_photo(chat_id=int(CHAT_ID), photo=img_url, caption=msg, parse_mode="Markdown")
-                    logger.info(f"Whale alert avec image envoyee: {len(news)} articles.")
-                    return
-                except Exception:
-                    pass
             msg = "*\U0001f40b\U0001f514 ALERTE WHALES!*\n\n" + "_Les gros detenteurs bougent des millions._\n\n" + msg
-            await app.bot.send_message(chat_id=int(CHAT_ID), text=msg, parse_mode="Markdown")
+            await safe_send(int(CHAT_ID), msg, app=app, photo=img_url)
             logger.info(f"Whale alert envoyee: {len(news)} articles.")
     except Exception as e:
         logger.error(f"Erreur whale check: {e}")
@@ -330,15 +331,8 @@ async def auto_economy_check(app):
         news = await fetch_economy_news(5)
         if news:
             img_url, msg = format_economy_news(news)
-            if img_url:
-                try:
-                    await app.bot.send_photo(chat_id=int(CHAT_ID), photo=img_url, caption=msg, parse_mode="Markdown")
-                    logger.info(f"Economy alert avec image envoyee: {len(news)} articles.")
-                    return
-                except Exception:
-                    pass
             msg = "*\U0001f3e2\U0001f514 ALERTE ECONOMIE CRYPTO!*\n\n" + "_Regulations, adoptions, decisions importantes._\n\n" + msg
-            await app.bot.send_message(chat_id=int(CHAT_ID), text=msg, parse_mode="Markdown")
+            await safe_send(int(CHAT_ID), msg, app=app, photo=img_url)
             logger.info(f"Economy alert envoyee: {len(news)} articles.")
     except Exception as e:
         logger.error(f"Erreur economy check: {e}")
@@ -351,15 +345,8 @@ async def auto_trump_check(app):
         news = await fetch_trump_crypto(5)
         if news:
             img_url, msg = format_trump_news(news)
-            if img_url:
-                try:
-                    await app.bot.send_photo(chat_id=int(CHAT_ID), photo=img_url, caption=msg, parse_mode="Markdown")
-                    logger.info(f"Trump alert avec image envoyee: {len(news)} articles.")
-                    return
-                except Exception:
-                    pass
             msg = "*\U0001f1fa\U0001f1f8\U0001f514 ALERTE TRUMP CRYPTO!*\n\n" + "_Tout ce que fait Trump sur les crypto._\n\n" + msg
-            await app.bot.send_message(chat_id=int(CHAT_ID), text=msg, parse_mode="Markdown")
+            await safe_send(int(CHAT_ID), msg, app=app, photo=img_url)
             logger.info(f"Trump alert envoyee: {len(news)} articles.")
     except Exception as e:
         logger.error(f"Erreur trump check: {e}")
@@ -382,7 +369,7 @@ async def daily_notification(app):
         if trump_news:
             msg += "\U0001f1fa\U0001f1f8 *Annonces Trump Crypto:*\n"
             for i, n in enumerate(trump_news[:3], 1):
-                msg += f"{i}. {n['title']}\n"
+                msg += f"{i}. {md_escape(n['title'])}\n"
                 if n.get("url"):
                     msg += f"   \U0001f517 {n['url']}\n"
             msg += "\n"
@@ -390,19 +377,19 @@ async def daily_notification(app):
         if whale:
             msg += "\U0001f40b *Whales:*\n"
             for i, n in enumerate(whale[:3], 1):
-                msg += f"{i}. {n['title']}\n"
+                msg += f"{i}. {md_escape(n['title'])}\n"
             msg += "\n"
 
         if economy:
             msg += "\U0001f3e2 *Economie:*\n"
             for i, n in enumerate(economy[:3], 1):
-                msg += f"{i}. {n['title']}\n"
+                msg += f"{i}. {md_escape(n['title'])}\n"
             msg += "\n"
 
         if news:
             msg += "\U0001f4f0 *News:*\n"
             for i, n in enumerate(news[:3], 1):
-                msg += f"{i}. {n['title']}\n"
+                msg += f"{i}. {md_escape(n['title'])}\n"
                 if n.get("url"):
                     msg += f"   \U0001f517 {n['url']}\n"
             msg += "\n"
@@ -416,7 +403,7 @@ async def daily_notification(app):
         msg += format_airdrops() + "\n\n"
         msg += format_promising()
 
-        await app.bot.send_message(chat_id=int(CHAT_ID), text=msg, parse_mode="Markdown")
+        await safe_send(int(CHAT_ID), msg, app=app)
         logger.info("Resume quotidien envoye.")
     except Exception as e:
         logger.error(f"Erreur resume: {e}")

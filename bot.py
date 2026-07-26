@@ -127,33 +127,32 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "\u2022 9 sources: Bloomberg, Reuters, CoinDesk, CoinTelegraph...\n\n"
         "_Alertes auto: News 15min | Whales 10min | Economy 15min | Trump 10min_"
     )
-    await update.message.reply_text(welcome, parse_mode="Markdown")
+    await safe_send(update.message.chat_id, welcome, app=context.application)
 
 
 async def cmd_news(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("\U0001f50d Recherche des news crypto...")
+    await safe_send(update.message.chat_id, "\U0001f50d Recherche des news crypto...", app=context.application)
     news = await fetch_all_news(10)
     img_url, msg = format_news_with_images(news)
-    chat_id = update.message.chat_id
-    await safe_send(chat_id, msg, app=context.application, photo=img_url)
+    await safe_send(update.message.chat_id, msg, app=context.application, photo=img_url)
 
 
 async def cmd_whales(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("\U0001f40b Recherche des news whales...")
+    await safe_send(update.message.chat_id, "\U0001f40b Recherche des news whales...", app=context.application)
     news = await fetch_whale_news(10)
     img_url, msg = format_whale_news(news)
     await safe_send(update.message.chat_id, msg, app=context.application, photo=img_url)
 
 
 async def cmd_economy(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("\U0001f3e2 Recherche de l'economie crypto...")
+    await safe_send(update.message.chat_id, "\U0001f3e2 Recherche de l'economie crypto...", app=context.application)
     news = await fetch_economy_news(10)
     img_url, msg = format_economy_news(news)
     await safe_send(update.message.chat_id, msg, app=context.application, photo=img_url)
 
 
 async def cmd_trump(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("\U0001f1fa\U0001f1f8 Recherche des annonces Trump crypto...")
+    await safe_send(update.message.chat_id, "\U0001f1fa\U0001f1f8 Recherche des annonces Trump crypto...", app=context.application)
     news = await fetch_trump_crypto(10)
     img_url, msg = format_trump_news(news)
     await safe_send(update.message.chat_id, msg, app=context.application, photo=img_url)
@@ -173,111 +172,103 @@ async def cmd_verify(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         title = parts[1]
         msg = format_verify(title, "", "")
-    await update.message.reply_text(msg, parse_mode="Markdown")
+    await safe_send(update.message.chat_id, msg, app=context.application)
 
 
 async def cmd_newcoins(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("\U0001f50d Recherche des nouvelles cryptomonnaies...")
+    await safe_send(update.message.chat_id, "\U0001f50d Recherche des nouvelles cryptomonnaies...", app=context.application)
     coins = await fetch_new_coins(10)
     msg = format_new_coins(coins)
-    await update.message.reply_text(msg, parse_mode="Markdown")
+    await safe_send(update.message.chat_id, msg, app=context.application)
 
 
 async def cmd_gainers(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("\U0001f4c8 Chargement des top gainers...")
+    await safe_send(update.message.chat_id, "\U0001f4c8 Chargement des top gainers...", app=context.application)
     coins = await fetch_top_gainers(10)
     msg = format_top_gainers(coins)
-    await update.message.reply_text(msg, parse_mode="Markdown")
+    await safe_send(update.message.chat_id, msg, app=context.application)
 
 
 async def cmd_trending(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("\U0001f525 Recherche des trending...")
+    await safe_send(update.message.chat_id, "\U0001f525 Recherche des trending...", app=context.application)
     coins = await fetch_trending()
     msg = format_trending(coins)
-    await update.message.reply_text(msg, parse_mode="Markdown")
+    await safe_send(update.message.chat_id, msg, app=context.application)
 
 
 async def cmd_airdrops(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = format_airdrops()
-    await update.message.reply_text(msg, parse_mode="Markdown")
+    await safe_send(update.message.chat_id, msg, app=context.application)
 
 
 async def cmd_promising(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = format_promising()
-    await update.message.reply_text(msg, parse_mode="Markdown")
+    await safe_send(update.message.chat_id, msg, app=context.application)
 
 
 async def cmd_summary(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = format_daily_summary()
-    await update.message.reply_text(msg, parse_mode="Markdown")
+    await safe_send(update.message.chat_id, "\U0001f4ca Chargement du resume complet...", app=context.application)
+    news = await fetch_all_news(5)
+    whale = await fetch_whale_news(3)
+    economy = await fetch_economy_news(3)
+    trump_news = await fetch_trump_crypto(3)
+    trending = await fetch_trending()
+    msg = format_daily_summary(news, whale, economy, trump_news, trending)
+    await safe_send(update.message.chat_id, msg, app=context.application)
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.lower()
+    chat_id = update.message.chat_id
     if any(w in text for w in ["whale", "whales", "gros", "baleine"]):
         news = await fetch_whale_news(10)
         img_url, msg = format_whale_news(news)
-        if img_url:
-            try:
-                await update.message.reply_photo(photo=img_url, caption=msg, parse_mode="Markdown")
-                return
-            except Exception:
-                pass
-        await update.message.reply_text(msg, parse_mode="Markdown")
+        await safe_send(chat_id, msg, app=context.application, photo=img_url)
     elif any(w in text for w in ["economie", "economy", "regulation", "ban", "adoption", "sec", "etf"]):
         news = await fetch_economy_news(10)
         img_url, msg = format_economy_news(news)
-        if img_url:
-            try:
-                await update.message.reply_photo(photo=img_url, caption=msg, parse_mode="Markdown")
-                return
-            except Exception:
-                pass
-        await update.message.reply_text(msg, parse_mode="Markdown")
+        await safe_send(chat_id, msg, app=context.application, photo=img_url)
     elif any(w in text for w in ["trump", "donald", "president usa", "white house"]):
         news = await fetch_trump_crypto(10)
         img_url, msg = format_trump_news(news)
-        if img_url:
-            try:
-                await update.message.reply_photo(photo=img_url, caption=msg, parse_mode="Markdown")
-                return
-            except Exception:
-                pass
-        await update.message.reply_text(msg, parse_mode="Markdown")
+        await safe_send(chat_id, msg, app=context.application, photo=img_url)
     elif any(w in text for w in ["verify", "verifier", "fake", "faux", "vrai", "true", "scam"]):
         title = text
         for prefix in ["verify", "verifier", "is this real", "is it fake", "scam"]:
             title = title.replace(prefix, "").strip()
         msg = format_verify(title, "", "")
-        await update.message.reply_text(msg, parse_mode="Markdown")
-    elif any(w in text for w in ["news", "info", "actualit", "nouvelle"]):
-        news = await fetch_all_news(10)
-        img_url, msg = format_news_with_images(news)
-        if img_url:
-            try:
-                await update.message.reply_photo(photo=img_url, caption=msg, parse_mode="Markdown")
-                return
-            except Exception:
-                pass
-        await update.message.reply_text(msg, parse_mode="Markdown")
+        await safe_send(chat_id, msg, app=context.application)
     elif any(w in text for w in ["airdrop", "air drops", "gratuit"]):
         msg = format_airdrops()
-        await update.message.reply_text(msg, parse_mode="Markdown")
+        await safe_send(chat_id, msg, app=context.application)
     elif any(w in text for w in ["prometteur", "projet", "project"]):
         msg = format_promising()
-        await update.message.reply_text(msg, parse_mode="Markdown")
+        await safe_send(chat_id, msg, app=context.application)
+    elif any(w in text for w in ["resume", "summary", "recap"]):
+        await safe_send(chat_id, "\U0001f4ca Chargement du resume...", app=context.application)
+        news = await fetch_all_news(5)
+        whale = await fetch_whale_news(3)
+        economy = await fetch_economy_news(3)
+        trump_news = await fetch_trump_crypto(3)
+        trending = await fetch_trending()
+        msg = format_daily_summary(news, whale, economy, trump_news, trending)
+        await safe_send(chat_id, msg, app=context.application)
     elif any(w in text for w in ["nouveau", "new coin", "latest"]):
         coins = await fetch_new_coins(10)
         msg = format_new_coins(coins)
-        await update.message.reply_text(msg, parse_mode="Markdown")
+        await safe_send(chat_id, msg, app=context.application)
     elif any(w in text for w in ["tendance", "trending", "popular"]):
         coins = await fetch_trending()
         msg = format_trending(coins)
-        await update.message.reply_text(msg, parse_mode="Markdown")
-    elif any(w in text for w in ["gagner", "gain", "hausse", "pump"]):
+        await safe_send(chat_id, msg, app=context.application)
+    elif any(w in text for w in ["gagner", "gain", "hausse", "pump", "gainer"]):
         coins = await fetch_top_gainers(10)
         msg = format_top_gainers(coins)
-        await update.message.reply_text(msg, parse_mode="Markdown")
+        await safe_send(chat_id, msg, app=context.application)
+    elif any(w in text for w in ["news", "info", "actualit", "nouvelle"]):
+        news = await fetch_all_news(10)
+        img_url, msg = format_news_with_images(news)
+        await safe_send(chat_id, msg, app=context.application, photo=img_url)
     else:
         msg = (
             "*Commandes:*\n\n"
@@ -293,7 +284,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "/promising - \U0001f680 Projets prometteurs\n"
             "/summary - \U0001f4ca Resume"
         )
-        await update.message.reply_text(msg, parse_mode="Markdown")
+        await safe_send(chat_id, msg, app=context.application)
 
 
 async def auto_news_check(app):

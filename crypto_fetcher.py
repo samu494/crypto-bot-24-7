@@ -44,7 +44,7 @@ FR_DICTIONARY = {
     "interest rate": "taux d'interet", "inflation": "inflation",
     "government": "gouvernement", "congress": "congres", "senate": "senat",
     "white house": "Maison Blanche", "president": "president",
-    "million": "millions", "billion": "milliards", "billion": "milliards",
+    "million": "millions", "billion": "milliards",
     "hack": "piratage", "hacked": "pirate", "exploit": "exploit",
     "scam": "arnaque", "fraud": "fraude", "rug pull": "rug pull",
     "surge": "hausse", "surges": "hausses", "soar": "bondir",
@@ -184,7 +184,7 @@ FR_DICTIONARY = {
     "smart contract": "contrat intelligent",
     "smart contracts": "contrats intelligents",
     "dapp": "dApp", "dapps": "dApps",
-    "dao": "DAO", "dao": "DAOs",
+    "dao": "DAO",
     "web3": "Web3", "web 3": "Web3",
     "metaverse": "metavers", "ai": "IA", "artificial intelligence": "intelligence artificielle",
     "machine learning": "apprentissage automatique",
@@ -1210,7 +1210,8 @@ def _format_single_news(i, n, show_image=True):
         for r in analysis["reasons"][:3]:
             msg += f"      - {md_escape(r)}\n"
     if n.get("url"):
-        msg += f"   \U0001f517 Source originale: {n['url']}\n"
+        safe_url = n['url'].replace("(", "%28").replace(")", "%29")
+        msg += f"   \U0001f517 Source originale: {safe_url}\n"
     msg += "\n"
     return msg
 
@@ -1302,16 +1303,17 @@ def format_trump_news(news_list):
 
 def format_verify(title, body="", source=""):
     analysis = analyze_credibility(title, body, source)
+    safe_title = md_escape(title) if title else "N/A"
     msg = f"*\U0001f50d Analyse de Fiabilite d'une News*\n\n"
-    msg += f"*Titre analyse:* {title}\n"
+    msg += f"*Titre analyse:* {safe_title}\n"
     if source:
-        msg += f"*Source:* {source}\n"
+        msg += f"*Source:* {md_escape(source)}\n"
     msg += f"\n*{analysis['icon']} Verdict: {analysis['verdict']}*\n"
     msg += f"*Score de fiabilite:* {analysis['score']}/100\n\n"
     if analysis["reasons"]:
         msg += "*Details de l'analyse:*\n"
         for r in analysis["reasons"]:
-            msg += f"  \u2022 {r}\n"
+            msg += f"  \u2022 {md_escape(r)}\n"
     else:
         msg += "_Aucun signal suspect ou fiable detecte automatiquement._\n"
     msg += "\n*Comment interpreter le score:*\n"
@@ -1327,11 +1329,13 @@ def format_new_coins(coins):
         return "Aucune nouvelle crypto trouvee."
     msg = f"*\U0001f195 Nouvelles Cryptomonnaies - {datetime.now().strftime('%d/%m/%Y')}*\n\n"
     for i, c in enumerate(coins, 1):
+        name = md_escape(c.get("name", "N/A"))
+        symbol = md_escape(c.get("symbol", "N/A"))
         if "price" in c:
             price_str = f"${c['price']:,.6f}" if c['price'] < 1 else f"${c['price']:,.2f}"
             change = c.get("change_24h", 0) or 0
             arrow = "+" if change >= 0 else ""
-            msg += f"*{i}. {c['name']} ({c['symbol']})*\n"
+            msg += f"*{i}. {name} ({symbol})*\n"
             msg += f"   \U0001f4b0 Prix: {price_str} | Variation 24h: {arrow}{change:.1f}%\n"
             mc = c.get("market_cap")
             if mc:
@@ -1340,7 +1344,7 @@ def format_new_coins(coins):
                 msg += f"   \U0001f517 {c['link']}\n"
             msg += "\n"
         else:
-            msg += f"*{i}. {c['name']} ({c['symbol']})*\n"
+            msg += f"*{i}. {name} ({symbol})*\n"
             msg += f"   \U0001f4cb Nouveau, pas encore de prix disponible\n"
             if c.get("link"):
                 msg += f"   \U0001f517 {c['link']}\n"
@@ -1353,10 +1357,12 @@ def format_top_gainers(coins):
         return "Aucun top gainers trouve."
     msg = f"*\U0001f4c8 Top Gainers 24h - {datetime.now().strftime('%d/%m/%Y')}*\n\n"
     for i, c in enumerate(coins, 1):
+        name = md_escape(c.get("name", "N/A"))
+        symbol = md_escape(c.get("symbol", "N/A"))
         change = c.get("change_24h", 0) or 0
         price = c.get("price", 0) or 0
         price_str = f"${price:,.6f}" if price < 1 else f"${price:,.2f}"
-        msg += f"*{i}. {c['name']} ({c['symbol']})*\n"
+        msg += f"*{i}. {name} ({symbol})*\n"
         msg += f"   \U0001f4b0 Prix: {price_str} | \U0001f7e2 +{change:.1f}%\n"
         mc = c.get("market_cap")
         if mc:
@@ -1372,7 +1378,9 @@ def format_trending(coins):
         return "Aucun trending trouve."
     msg = f"*\U0001f525 Crypto Trending - {datetime.now().strftime('%d/%m/%Y')}*\n\n"
     for i, c in enumerate(coins, 1):
-        msg += f"*{i}. {c['name']} ({c['symbol']})*\n"
+        name = md_escape(c.get("name", "N/A"))
+        symbol = md_escape(c.get("symbol", "N/A"))
+        msg += f"*{i}. {name} ({symbol})*\n"
         if c.get("market_cap_rank"):
             msg += f"   \U0001f3c6 Rang capitalisation: #{c['market_cap_rank']}\n"
         if c.get("link"):
@@ -1422,16 +1430,47 @@ def format_promising():
     return msg
 
 
-def format_daily_summary():
+def format_daily_summary(news=None, whale=None, economy=None, trump_news=None, trending=None):
     msg = f"*\U0001f4ca Resume Quotidien - {datetime.now().strftime('%d/%m/%Y')}*\n\n"
-    msg += "/news - \U0001f4f0 News crypto temps reel\n"
-    msg += "/whales - \U0001f40b News whales\n"
-    msg += "/economy - \U0001f3e2 Economie crypto\n"
-    msg += "/trump - \U0001f1fa\U0001f1f8 Annonces Trump crypto\n"
-    msg += "/verify - \U0001f50d Verifier une news\n"
-    msg += "/newcoins - \U0001f195 Nouvelles cryptomonnaies\n"
-    msg += "/gainers - \U0001f4c8 Top gainers 24h\n"
-    msg += "/trending - \U0001f525 Crypto en tendance\n"
-    msg += "/airdrops - \U0001f381 Airdrops avec liens\n"
-    msg += "/promising - \U0001f680 Projets prometteurs\n"
+
+    if trump_news:
+        msg += "\U0001f1fa\U0001f1f8 *Annonces Trump Crypto:*\n"
+        for i, n in enumerate(trump_news[:3], 1):
+            msg += f"{i}. {md_escape(n.get('title', 'N/A'))}\n"
+            if n.get("url"):
+                msg += f"   \U0001f517 {n['url']}\n"
+        msg += "\n"
+
+    if whale:
+        msg += "\U0001f40b *Whales:*\n"
+        for i, n in enumerate(whale[:3], 1):
+            msg += f"{i}. {md_escape(n.get('title', 'N/A'))}\n"
+        msg += "\n"
+
+    if economy:
+        msg += "\U0001f3e2 *Economie:*\n"
+        for i, n in enumerate(economy[:3], 1):
+            msg += f"{i}. {md_escape(n.get('title', 'N/A'))}\n"
+        msg += "\n"
+
+    if news:
+        msg += "\U0001f4f0 *News:*\n"
+        for i, n in enumerate(news[:3], 1):
+            msg += f"{i}. {md_escape(n.get('title', 'N/A'))}\n"
+            if n.get("url"):
+                msg += f"   \U0001f517 {n['url']}\n"
+        msg += "\n"
+
+    if trending:
+        msg += "\U0001f525 *Trending:*\n"
+        for i, c in enumerate(trending[:5], 1):
+            msg += f"{i}. {md_escape(c.get('name', 'N/A'))} ({md_escape(c.get('symbol', ''))})\n"
+        msg += "\n"
+
+    msg += format_airdrops() + "\n\n"
+    msg += format_promising()
+
+    if not any([trump_news, whale, economy, news, trending]):
+        msg += "\n_Aucune donnee disponible pour le moment._"
+
     return msg
